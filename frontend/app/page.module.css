@@ -1,0 +1,62 @@
+.main {
+  max-width: 32rem;
+  margin: 0 auto;
+  padding: 4rem 1.5rem;
+}
+
+.title {
+  margin: 0;
+  font-size: 2rem;
+  letter-spacing: -0.02em;
+}
+
+.subtitle {
+  margin: 0.25rem 0 2.5rem;
+  color: var(--muted);
+}
+
+.card {
+  border: 1px solid var(--border);
+  border-radius: 0.75rem;
+  padding: 1.25rem 1.5rem;
+  background: var(--surface);
+}
+
+.cardTitle {
+  margin: 0 0 1rem;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--muted);
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 0.5rem 1.5rem;
+  margin: 0;
+}
+
+.grid dt {
+  color: var(--muted);
+}
+
+.grid dd {
+  margin: 0;
+  font-variant-numeric: tabular-nums;
+}
+
+.muted {
+  margin: 0;
+  color: var(--muted);
+}
+
+.up {
+  color: var(--ok);
+}
+
+.down {
+  margin: 0;
+  color: var(--error);
+}

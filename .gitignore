@@ -1,30 +1,31 @@
-/vendor/
-node_modules/
+.idea
+.claude
+.DS_Store
 npm-debug.log
 yarn-error.log
 
-# Laravel 4 specific
-bootstrap/compiled.php
-app/storage/
-
-# Laravel 5 & Lumen specific
-public/storage
-public/hot
-
-# Laravel 5 & Lumen specific with changed public path
-public_html/storage
-public_html/hot
-
-storage/*.key
+# Секреты и локальное окружение (и в корне, и в backend/)
 .env
-Homestead.yaml
-Homestead.json
-/.vagrant
-.phpunit.result.cache
-
-/public/build
-/storage/pail
 .env.backup
 .env.production
-.phpactor.json
 auth.json
+.phpactor.json
+
+# Бэкенд — Laravel в backend/
+/backend/vendor/
+/backend/storage/*.key
+/backend/storage/pail
+/backend/.phpunit.result.cache
+/backend/public/storage
+/backend/public/hot
+
+# Фронтенд — Next.js в frontend/
+node_modules/
+/frontend/.next/
+/frontend/out/
+/frontend/next-env.d.ts
+/frontend/.eslintcache
+
+# Собранный релиз — артефакт сборки.
+# Шаблоны .htaccess и front controller лежат в hosting/ и версионируются.
+/deploy/

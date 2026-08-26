@@ -1,0 +1,87 @@
+name: litoreya
+
+# Два режима запуска, оба нужны:
+#   make dev       — Next dev-сервер (:3000) + Apache с Laravel API (:8080)
+#   make prodlike  — собранная статика + API под одним Apache (:8081),
+#                    раскладка байт-в-байт как на shared хостинге
+#
+# БД без профиля — поднимается в обоих режимах.
+
+services:
+  db:
+    image: mysql:8.0
+    environment:
+      MYSQL_DATABASE: ${DB_DATABASE:-litoreya}
+      MYSQL_USER: ${DB_USERNAME:-litoreya}
+      MYSQL_PASSWORD: ${DB_PASSWORD:-secret}
+      MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASSWORD:-root}
+    ports:
+      - "${DB_PORT:-3307}:3306"
+    volumes:
+      - db-data:/var/lib/mysql
+      # Создаёт БД под тесты при первичной инициализации тома
+      - ./docker/mysql/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-p${DB_ROOT_PASSWORD:-root}"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  # --- dev ---------------------------------------------------------------
+
+  api:
+    profiles: [dev]
+    build:
+      context: ./docker/php
+      # www-data внутри образа получает uid хоста — иначе Apache не сможет
+      # писать в storage/ и bootstrap/cache смонтированного кода
+      args:
+        UID: ${UID:-1000}
+        GID: ${GID:-1000}
+    image: litoreya-php:8.2
+    volumes:
+      - ./backend:/var/www/laravel
+      - ./docker/php/vhost-dev.conf:/etc/apache2/sites-available/000-default.conf:ro
+    ports:
+      - "${API_PORT:-8080}:80"
+    depends_on:
+      db:
+        condition: service_healthy
+
+  node:
+    profiles: [dev]
+    image: node:20
+    working_dir: /app
+    user: "${UID:-1000}:${GID:-1000}"
+    volumes:
+      - ./frontend:/app
+    ports:
+      - "${WEB_PORT:-3000}:3000"
+    command: sh -c "npm install && npm run dev"
+
+  # --- prod-like ---------------------------------------------------------
+
+  web:
+    profiles: [prodlike]
+    build:
+      context: ./docker/php
+      # www-data внутри образа получает uid хоста — иначе Apache не сможет
+      # писать в storage/ и bootstrap/cache смонтированного кода
+      args:
+        UID: ${UID:-1000}
+        GID: ${GID:-1000}
+    image: litoreya-php:8.2
+    volumes:
+      # Ровно та же пара каталогов, что на хостинге: ~/public_html и ~/laravel.
+      # Относительный путь ../../laravel из api/index.php совпадает здесь и там.
+      - ./deploy/public_html:/var/www/public_html
+      - ./backend:/var/www/laravel
+      - ./docker/php/vhost-prodlike.conf:/etc/apache2/sites-available/000-default.conf:ro
+    ports:
+      - "${PRODLIKE_PORT:-8081}:80"
+    depends_on:
+      db:
+        condition: service_healthy
+
+volumes:
+  db-data:
