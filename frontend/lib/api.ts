@@ -147,3 +147,58 @@ export const updateKeyphrase = (
     current_password: currentPassword,
     crypto: wrapper,
   });
+
+// ---------------------------------------------------------------- записи
+
+/**
+ * Записи в том виде, в каком их знает сервер: служебные поля плюс блоб.
+ * Ни заголовка, ни содержимого здесь нет — они внутри ciphertext.
+ */
+export type EncryptedRecord = {
+  id: number;
+  iv: string;
+  ciphertext: string;
+  payload_version: number;
+  created_at: string;
+  updated_at: string;
+};
+
+export type PostRecord = EncryptedRecord & {
+  type: "text" | "password";
+  category_id: number | null;
+  deleted_at: string | null;
+};
+
+export type CategoryRecord = EncryptedRecord & {
+  position: number;
+};
+
+type Envelope<T> = { data: T };
+
+export const listPosts = () =>
+  request<Envelope<PostRecord[]>>("GET", "/posts").then((r) => r.data);
+
+export const createPost = (body: Record<string, unknown>) =>
+  request<Envelope<PostRecord>>("POST", "/posts", body).then((r) => r.data);
+
+export const updatePost = (id: number, body: Record<string, unknown>) =>
+  request<Envelope<PostRecord>>("PUT", `/posts/${id}`, body).then((r) => r.data);
+
+export const deletePost = (id: number) =>
+  request<void>("DELETE", `/posts/${id}`);
+
+export const listCategories = () =>
+  request<Envelope<CategoryRecord[]>>("GET", "/categories").then((r) => r.data);
+
+export const createCategory = (body: Record<string, unknown>) =>
+  request<Envelope<CategoryRecord>>("POST", "/categories", body).then(
+    (r) => r.data,
+  );
+
+export const updateCategory = (id: number, body: Record<string, unknown>) =>
+  request<Envelope<CategoryRecord>>("PUT", `/categories/${id}`, body).then(
+    (r) => r.data,
+  );
+
+export const deleteCategory = (id: number) =>
+  request<void>("DELETE", `/categories/${id}`);

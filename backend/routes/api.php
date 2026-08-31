@@ -4,7 +4,9 @@ use App\Http\Controllers\Auth\KeyphraseController;
 use App\Http\Controllers\Auth\LoginController;
 use App\Http\Controllers\Auth\RegisterController;
 use App\Http\Controllers\Auth\SessionController;
+use App\Http\Controllers\CategoryController;
 use App\Http\Controllers\HealthController;
+use App\Http\Controllers\PostController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -29,4 +31,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/auth/me', SessionController::class);
     Route::post('/auth/logout', [LoginController::class, 'destroy']);
     Route::put('/auth/keyphrase', KeyphraseController::class);
+
+    Route::apiResource('categories', CategoryController::class)->except('show');
+    Route::apiResource('posts', PostController::class);
 });

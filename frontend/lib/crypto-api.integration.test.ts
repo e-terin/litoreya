@@ -178,6 +178,123 @@ describe.skipIf(!API)("крипто-модуль против живого API",
     await expect(unlockWithKeyphrase(phrase, after)).rejects.toThrow();
   }, 180_000);
 
+  /**
+   * Главное проверяемое свойство проекта: то, что сервер хранит, не содержит
+   * открытого текста — включая заголовок.
+   */
+  it("сохранённая запись не содержит открытого текста нигде в ответе сервера", async () => {
+    const phrase = "фраза для проверки постов";
+    const email = `posts-${Date.now()}-${Math.random().toString(36).slice(2, 8)}@example.com`;
+
+    const jar = await freshJar();
+    const { envelope, dek } = await createEnvelope(phrase);
+
+    await call(jar, "POST", "/api/auth/register", {
+      name: "Integration",
+      email,
+      password: "correct-horse-battery",
+      password_confirmation: "correct-horse-battery",
+      crypto: envelope,
+    });
+
+    const secret = {
+      title: "Совершенно секретный заголовок",
+      username: "ivan",
+      password: "hunter2-очень-секретно",
+      url: "https://bank.example",
+      note: "кодовое слово омлет",
+    };
+
+    const encrypted = await encryptPayload(dek, secret);
+    const created = await call(jar, "POST", "/api/posts", {
+      ...encrypted,
+      type: "password",
+      category_id: null,
+    });
+
+    expect(created.status, JSON.stringify(created.data)).toBe(201);
+
+    // Ни одно значение из открытого текста не должно встречаться в том,
+    // что вернул сервер
+    const listed = await call(jar, "GET", "/api/posts");
+    const raw = JSON.stringify(listed.data);
+
+    for (const value of Object.values(secret)) {
+      expect(raw).not.toContain(value);
+    }
+
+    // И при этом запись читается обратно целиком
+    const record = listed.data.data[0];
+    await expect(decryptPayload(dek, record)).resolves.toEqual(secret);
+  }, 120_000);
+
+  it("чужие записи недоступны", async () => {
+    const password = "correct-horse-battery";
+
+    const owner = await freshJar();
+    const { envelope: ownerEnvelope, dek } = await createEnvelope("фраза владельца записи");
+    await call(owner, "POST", "/api/auth/register", {
+      name: "Owner",
+      email: `owner-${Date.now()}-${Math.random().toString(36).slice(2, 8)}@example.com`,
+      password,
+      password_confirmation: password,
+      crypto: ownerEnvelope,
+    });
+
+    const encrypted = await encryptPayload(dek, { title: "Моё", body: "личное" });
+    const created = await call(owner, "POST", "/api/posts", {
+      ...encrypted,
+      type: "text",
+      category_id: null,
+    });
+    const postId = created.data.data.id;
+
+    const stranger = await freshJar();
+    const { envelope: strangerEnvelope } = await createEnvelope("фраза постороннего лица");
+    await call(stranger, "POST", "/api/auth/register", {
+      name: "Stranger",
+      email: `stranger-${Date.now()}-${Math.random().toString(36).slice(2, 8)}@example.com`,
+      password,
+      password_confirmation: password,
+      crypto: strangerEnvelope,
+    });
+
+    // 404, а не 403: код ответа не должен подсказывать, что такой id существует
+    const read = await call(stranger, "GET", `/api/posts/${postId}`);
+    expect(read.status).toBe(404);
+
+    const list = await call(stranger, "GET", "/api/posts");
+    expect(list.data.data).toHaveLength(0);
+  }, 180_000);
+
+  it("категория переживает круг через сервер", async () => {
+    const email = `cat-${Date.now()}-${Math.random().toString(36).slice(2, 8)}@example.com`;
+    const jar = await freshJar();
+    const { envelope, dek } = await createEnvelope("фраза для проверки категорий");
+
+    await call(jar, "POST", "/api/auth/register", {
+      name: "Integration",
+      email,
+      password: "correct-horse-battery",
+      password_confirmation: "correct-horse-battery",
+      crypto: envelope,
+    });
+
+    const encrypted = await encryptPayload(dek, { name: "Финансы" });
+    const created = await call(jar, "POST", "/api/categories", {
+      ...encrypted,
+      position: 0,
+    });
+
+    expect(created.status).toBe(201);
+    expect(JSON.stringify(created.data)).not.toContain("Финансы");
+
+    const listed = await call(jar, "GET", "/api/categories");
+    await expect(decryptPayload(dek, listed.data.data[0])).resolves.toEqual({
+      name: "Финансы",
+    });
+  }, 120_000);
+
   it("сервер отвергает ослабленные параметры KDF", async () => {
     const jar = await freshJar();
     const { envelope } = await createEnvelope("пятая фраза для проверки");

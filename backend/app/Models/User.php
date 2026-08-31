@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Database\Factories\UserFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Laravel\Sanctum\HasApiTokens;
@@ -75,5 +76,21 @@ class User extends Authenticatable
     public function cryptoEnvelope(): array
     {
         return $this->only(self::CRYPTO_FIELDS);
+    }
+
+    /**
+     * Все обращения к записям идут только через эти связи.
+     *
+     * Так принадлежность пользователю обеспечивается структурой запроса, а не
+     * дисциплиной автора контроллера: забыть проверку владельца попросту негде.
+     */
+    public function posts(): HasMany
+    {
+        return $this->hasMany(Post::class);
+    }
+
+    public function categories(): HasMany
+    {
+        return $this->hasMany(Category::class);
     }
 }
