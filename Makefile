@@ -1,7 +1,8 @@
 .DEFAULT_GOAL := help
-.PHONY: help setup dev prodlike release down clean shell artisan migrate test
+.PHONY: help setup dev prodlike release down clean shell artisan migrate test test-back test-front test-integration
 
 DC := docker compose
+NPM := docker run --rm -u $(shell id -u):$(shell id -g) -e HOME=/tmp -v "$(CURDIR)/frontend":/app -w /app node:20
 
 help: ## Показать список команд
 	@grep -hE '^[a-zA-Z_-]+:.*?## ' $(MAKEFILE_LIST) \
@@ -38,5 +39,15 @@ artisan: ## Произвольная artisan-команда: make artisan CMD="r
 migrate: ## Накатить миграции
 	$(DC) --profile dev run --rm api php artisan migrate --force
 
-test: ## Тесты бэкенда
+test: test-back test-front ## Все тесты (бэкенд + фронтенд)
+
+test-back: ## Тесты бэкенда
 	$(DC) --profile dev run --rm api php artisan test
+
+test-front: ## Тесты крипто-ядра и KeyVault
+	$(NPM) npm test
+
+test-integration: ## Стык крипто-модуля с живым API (нужен запущенный prodlike)
+	docker run --rm -u $$(id -u):$$(id -g) -e HOME=/tmp \
+		-e LITOREYA_API=http://localhost:$${PRODLIKE_PORT:-8081} --network host \
+		-v "$$PWD/frontend":/app -w /app node:20 npm run test:integration

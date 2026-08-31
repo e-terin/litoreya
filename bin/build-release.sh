@@ -22,8 +22,11 @@ if [ ! -d frontend/out ]; then
 fi
 
 echo "==> Сборка deploy/public_html"
-rm -rf deploy/public_html
+# Каталог примонтирован в контейнер prod-like режима. rm -rf уничтожил бы inode,
+# и bind-mount остался бы висеть на удалённом каталоге — Apache начал бы отдавать
+# 404 до пересоздания контейнера. Поэтому чистим содержимое, а не каталог.
 mkdir -p deploy/public_html
+find deploy/public_html -mindepth 1 -delete
 
 # Статика Next.js
 cp -r frontend/out/. deploy/public_html/

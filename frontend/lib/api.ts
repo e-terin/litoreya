@@ -9,47 +9,104 @@
  * в dev его обеспечивает rewrite в next.config.ts, в проде — Apache.
  */
 
+import type { CryptoEnvelope, KeyphraseWrapper } from "./crypto";
+
 const BASE = "/api";
 
 export class ApiError extends Error {
   constructor(
     readonly status: number,
     message: string,
-    readonly payload?: unknown,
+    readonly errors: Record<string, string[]> = {},
   ) {
     super(message);
     this.name = "ApiError";
   }
+
+  /** Первое сообщение по полю — форме обычно нужно именно оно. */
+  errorFor(field: string): string | undefined {
+    return this.errors[field]?.[0];
+  }
 }
 
-export async function apiFetch<T>(
+// ---------------------------------------------------------------- CSRF
+
+function readCookie(name: string): string | null {
+  const match = document.cookie.match(new RegExp(`(^|; )${name}=([^;]*)`));
+  // Значение куки URL-кодировано, Laravel ждёт заголовок в исходном виде
+  return match ? decodeURIComponent(match[2]) : null;
+}
+
+/**
+ * Sanctum отдаёт XSRF-TOKEN обычной (не HttpOnly) кукой, чтобы JS мог вернуть
+ * её значение заголовком. Кука живёт столько же, сколько сессия, поэтому
+ * запрашиваем её только когда она отсутствует.
+ */
+async function ensureCsrfCookie(): Promise<void> {
+  if (readCookie("XSRF-TOKEN")) return;
+
+  await fetch(`${BASE}/csrf-cookie`, {
+    credentials: "same-origin",
+    headers: { Accept: "application/json" },
+  });
+}
+
+// ---------------------------------------------------------------- транспорт
+
+async function request<T>(
+  method: string,
   path: string,
-  init: RequestInit = {},
+  body?: unknown,
 ): Promise<T> {
-  const hasBody = init.body !== undefined;
+  const mutating = method !== "GET";
+
+  if (mutating) await ensureCsrfCookie();
+
+  const csrf = readCookie("XSRF-TOKEN");
 
   const response = await fetch(`${BASE}${path}`, {
-    ...init,
+    method,
     // Сессионная кука должна уходить с каждым запросом
     credentials: "same-origin",
     headers: {
       Accept: "application/json",
-      ...(hasBody ? { "Content-Type": "application/json" } : {}),
-      ...init.headers,
+      ...(body !== undefined ? { "Content-Type": "application/json" } : {}),
+      ...(csrf ? { "X-XSRF-TOKEN": csrf } : {}),
     },
+    body: body !== undefined ? JSON.stringify(body) : undefined,
   });
+
+  if (response.status === 204) return undefined as T;
 
   const payload = await response.json().catch(() => undefined);
 
   if (!response.ok) {
-    const message =
-      (payload as { message?: string } | undefined)?.message ??
-      `HTTP ${response.status}`;
-    throw new ApiError(response.status, message, payload);
+    const data = payload as
+      | { message?: string; errors?: Record<string, string[]> }
+      | undefined;
+
+    throw new ApiError(
+      response.status,
+      data?.message ?? `HTTP ${response.status}`,
+      data?.errors ?? {},
+    );
   }
 
   return payload as T;
 }
+
+// ---------------------------------------------------------------- типы
+
+export type User = {
+  id: number;
+  name: string;
+  email: string;
+};
+
+export type Session = {
+  user: User;
+  crypto: CryptoEnvelope;
+};
 
 export type Health = {
   status: "ok" | "degraded";
@@ -59,4 +116,34 @@ export type Health = {
   time: string;
 };
 
-export const getHealth = () => apiFetch<Health>("/health");
+// ---------------------------------------------------------------- эндпоинты
+
+export const getHealth = () => request<Health>("GET", "/health");
+
+export const me = () => request<Session>("GET", "/auth/me");
+
+export const login = (email: string, password: string) =>
+  request<Session>("POST", "/auth/login", { email, password });
+
+/**
+ * Конверт собирается вызывающим кодом заранее: ключевая фраза не должна
+ * оказаться в этом модуле даже как аргумент.
+ */
+export const register = (input: {
+  name: string;
+  email: string;
+  password: string;
+  password_confirmation: string;
+  crypto: CryptoEnvelope;
+}) => request<Session>("POST", "/auth/register", input);
+
+export const logout = () => request<void>("POST", "/auth/logout", {});
+
+export const updateKeyphrase = (
+  currentPassword: string,
+  wrapper: KeyphraseWrapper,
+) =>
+  request<{ crypto: CryptoEnvelope }>("PUT", "/auth/keyphrase", {
+    current_password: currentPassword,
+    crypto: wrapper,
+  });
