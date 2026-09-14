@@ -21,6 +21,7 @@ class CategoryFactory extends Factory
             'iv' => base64_encode(random_bytes(12)),
             'ciphertext' => base64_encode(random_bytes(48)),
             'payload_version' => 1,
+            'parent_id' => null,
             'position' => 0,
         ];
     }

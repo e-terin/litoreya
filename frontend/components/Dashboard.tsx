@@ -17,6 +17,7 @@ import {
   type PostType,
   type TextPayload,
 } from "@/lib/vault";
+import { buildCategoryTree, descendantIds } from "@/lib/tree";
 import { CategorySidebar } from "./CategorySidebar";
 import { PostEditor } from "./PostEditor";
 import s from "./ui.module.css";
@@ -33,6 +34,7 @@ export function Dashboard() {
   const [posts, setPosts] = useState<Post[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [filter, setFilter] = useState<Filter>(null);
+  const [expanded, setExpanded] = useState<Set<number>>(readExpanded);
   const [query, setQuery] = useState("");
   const [editing, setEditing] = useState<Editing>(null);
   const [loading, setLoading] = useState(true);
@@ -61,15 +63,23 @@ export function Dashboard() {
     void refresh();
   }, [refresh]);
 
+  const tree = useMemo(() => buildCategoryTree(categories), [categories]);
+
   const visible = useMemo(() => {
+    // Выбор категории показывает всю ветку: иначе родительский узел выглядел
+    // бы пустым, хотя записи лежат в его подкатегориях.
+    const branch =
+      typeof filter === "number" ? descendantIds(tree, filter) : null;
+
     const byCategory = posts.filter((post) => {
       if (filter === null) return true;
       if (filter === "none") return post.categoryId === null;
-      return post.categoryId === filter;
+
+      return post.categoryId !== null && branch!.has(post.categoryId);
     });
 
     return searchPosts(byCategory, query);
-  }, [posts, filter, query]);
+  }, [posts, tree, filter, query]);
 
   async function handleSave(input: {
     id?: number;
@@ -89,7 +99,19 @@ export function Dashboard() {
     await refresh();
   }
 
-  async function handleCategorySave(input: { id?: number; name: string }) {
+  function handleToggle(id: number) {
+    const next = new Set(expanded);
+    if (!next.delete(id)) next.add(id);
+
+    setExpanded(next);
+    writeExpanded(next);
+  }
+
+  async function handleCategorySave(input: {
+    id?: number;
+    name: string;
+    parentId?: number | null;
+  }) {
     if (!dek) return;
     await saveCategory(dek, input);
     await refresh();
@@ -118,9 +140,11 @@ export function Dashboard() {
 
       <div className={v.layout}>
         <CategorySidebar
-          categories={categories}
+          tree={tree}
           posts={posts}
           active={filter}
+          expanded={expanded}
+          onToggle={handleToggle}
           onSelect={(next) => {
             setFilter(next);
             setEditing(null);
@@ -133,7 +157,7 @@ export function Dashboard() {
           {editing ? (
             <PostEditor
               post={editing.post}
-              categories={categories}
+              tree={tree}
               onSave={handleSave}
               onDelete={handleDelete}
               onCancel={() => setEditing(null)}
@@ -211,4 +235,44 @@ function PostCard({ post, onOpen }: { post: Post; onOpen(): void }) {
       {subtitle && <span className={v.cardMeta}>{subtitle}</span>}
     </button>
   );
+}
+
+// ---------------------------------------------------------------- хранилище
+
+/**
+ * Развёрнутые ветки переживают перезагрузку вкладки.
+ *
+ * Это единственное, что приложение кладёт в localStorage. От него осознанно
+ * отказались для мастер-ключа (см. lib/keyvault.ts), и запрет здесь не
+ * ослабляется: наружу уходят только номера категорий — ни названий, ни ключей.
+ * Любая ошибка чтения означает лишь свёрнутое дерево, поэтому она глушится.
+ *
+ * Читается прямо в инициализаторе useState. Расхождения при гидратации это не
+ * даёт: пререндер отдаёт экран загрузки, а дашборд монтируется только после
+ * того, как сессия разрешилась, — то есть уже в браузере.
+ */
+const EXPANDED_KEY = "litoreya:categories:expanded";
+
+function readExpanded(): Set<number> {
+  if (typeof window === "undefined") return new Set();
+
+  try {
+    const raw = localStorage.getItem(EXPANDED_KEY);
+    if (!raw) return new Set();
+
+    const parsed: unknown = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return new Set();
+
+    return new Set(parsed.filter((id): id is number => typeof id === "number"));
+  } catch {
+    return new Set();
+  }
+}
+
+function writeExpanded(expanded: Set<number>): void {
+  try {
+    localStorage.setItem(EXPANDED_KEY, JSON.stringify([...expanded]));
+  } catch {
+    // Приватный режим или переполненная квота — дерево просто не запомнится
+  }
 }

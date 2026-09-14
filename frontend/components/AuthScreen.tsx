@@ -3,6 +3,7 @@
 import { useState, type FormEvent } from "react";
 import { ApiError } from "@/lib/api";
 import { useSession } from "@/lib/session";
+import { SecretInput } from "./SecretInput";
 import s from "./ui.module.css";
 
 type Mode = "login" | "register";
@@ -98,10 +99,8 @@ function LoginForm({
         <label className={s.label} htmlFor="login-password">
           Пароль
         </label>
-        <input
+        <SecretInput
           id="login-password"
-          className={s.input}
-          type="password"
           autoComplete="current-password"
           required
           value={password}
@@ -208,10 +207,8 @@ function RegisterForm({
         <label className={s.label} htmlFor="reg-password">
           Пароль
         </label>
-        <input
+        <SecretInput
           id="reg-password"
-          className={s.input}
-          type="password"
           autoComplete="new-password"
           required
           value={password}
@@ -231,10 +228,8 @@ function RegisterForm({
         <label className={s.label} htmlFor="reg-keyphrase">
           Ключевая фраза
         </label>
-        <input
+        <SecretInput
           id="reg-keyphrase"
-          className={s.input}
-          type="password"
           autoComplete="new-password"
           required
           value={keyphrase}
@@ -251,10 +246,8 @@ function RegisterForm({
         <label className={s.label} htmlFor="reg-keyphrase-repeat">
           Ключевая фраза ещё раз
         </label>
-        <input
+        <SecretInput
           id="reg-keyphrase-repeat"
-          className={s.input}
-          type="password"
           autoComplete="new-password"
           required
           value={keyphraseRepeat}

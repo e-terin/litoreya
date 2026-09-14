@@ -3,6 +3,7 @@
 import { useState, type FormEvent } from "react";
 import { EnvelopeMismatchError, WrongKeyphraseError } from "@/lib/crypto";
 import { useSession } from "@/lib/session";
+import { SecretInput } from "./SecretInput";
 import s from "./ui.module.css";
 
 /**
@@ -52,10 +53,15 @@ export function UnlockScreen() {
             <label className={s.label} htmlFor="unlock-secret">
               {useRecovery ? "Код восстановления" : "Ключевая фраза"}
             </label>
-            <input
+            {/*
+              key заставляет компонент перемонтироваться при смене режима:
+              переключатель уже чистит введённое, и показ обязан сброситься
+              вместе с ним, а не утянуть в поле фразы состояние от кода.
+            */}
+            <SecretInput
+              key={useRecovery ? "recovery" : "phrase"}
               id="unlock-secret"
-              className={s.input}
-              type={useRecovery ? "text" : "password"}
+              defaultRevealed={useRecovery}
               autoComplete={useRecovery ? "off" : "current-password"}
               autoFocus
               required

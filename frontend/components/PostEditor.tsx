@@ -3,26 +3,26 @@
 import { useState, type FormEvent } from "react";
 import {
   emptyPayload,
-  type Category,
   type PasswordPayload,
   type Post,
   type PostPayload,
   type PostType,
   type TextPayload,
 } from "@/lib/vault";
+import { flattenAll, type CategoryNode } from "@/lib/tree";
 import { PasswordField } from "./PasswordField";
 import s from "./ui.module.css";
 import v from "./vault.module.css";
 
 export function PostEditor({
   post,
-  categories,
+  tree,
   onSave,
   onDelete,
   onCancel,
 }: {
   post: Post | null;
-  categories: Category[];
+  tree: CategoryNode[];
   onSave(input: {
     id?: number;
     type: PostType;
@@ -207,9 +207,13 @@ export function PostEditor({
             }
           >
             <option value="">Без категории</option>
-            {categories.map((category) => (
+            {/*
+              Вложенность показывается неразрывными пробелами: оформить
+              <option> через CSS браузеры не дают.
+            */}
+            {flattenAll(tree).map((category) => (
               <option key={category.id} value={category.id}>
-                {category.name}
+                {"\u00a0\u00a0".repeat(category.depth) + category.name}
               </option>
             ))}
           </select>

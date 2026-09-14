@@ -9,6 +9,7 @@ import {
   passwordEntropyBits,
   type PasswordOptions,
 } from "@/lib/password";
+import { SecretInput } from "./SecretInput";
 import s from "./ui.module.css";
 import v from "./vault.module.css";
 
@@ -49,21 +50,16 @@ export function PasswordField({
       </label>
 
       <div className={v.secretRow}>
-        <input
+        {/* Показ здесь управляемый: раскрыть поле должен и генератор. */}
+        <SecretInput
           id="post-password"
-          className={`${s.input} ${v.secretInput}`}
-          type={revealed ? "text" : "password"}
+          className={v.secretInput}
           autoComplete="off"
+          revealed={revealed}
+          onRevealedChange={setRevealed}
           value={value}
           onChange={(e) => onChange(e.target.value)}
         />
-        <button
-          type="button"
-          className={v.smallButton}
-          onClick={() => setRevealed((r) => !r)}
-        >
-          {revealed ? "Скрыть" : "Показать"}
-        </button>
         <button
           type="button"
           className={v.smallButton}

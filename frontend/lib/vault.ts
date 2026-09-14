@@ -60,6 +60,7 @@ export type Post = {
 export type Category = {
   id: number;
   position: number;
+  parentId: number | null;
   name: string;
   broken?: boolean;
 };
@@ -126,11 +127,15 @@ export async function loadCategories(dek: CryptoKey): Promise<Category[]> {
           (payload) => ({
             id: record.id,
             position: record.position,
+            parentId: record.parent_id,
             name: payload.name,
           }),
+          // parentId нужен и здесь: без него нерасшифрованная категория
+          // выпала бы из своего места, и вся ветка под ней осиротела бы
           () => ({
             id: record.id,
             position: record.position,
+            parentId: record.parent_id,
             name: "— не расшифровано —",
             broken: true,
           }),
@@ -164,10 +169,15 @@ export async function savePost(
 
 export async function saveCategory(
   dek: CryptoKey,
-  input: { id?: number; name: string; position?: number },
+  input: { id?: number; name: string; position?: number; parentId?: number | null },
 ): Promise<void> {
   const encrypted = await encryptPayload(dek, { name: input.name });
-  const body = { ...encrypted, position: input.position ?? 0 };
+
+  const body = {
+    ...encrypted,
+    position: input.position ?? 0,
+    parent_id: input.parentId ?? null,
+  };
 
   if (input.id) await api.updateCategory(input.id, body);
   else await api.createCategory(body);

@@ -171,6 +171,8 @@ export type PostRecord = EncryptedRecord & {
 
 export type CategoryRecord = EncryptedRecord & {
   position: number;
+  /** Дерево. Открытое поле: сервер видит форму, но не названия. */
+  parent_id: number | null;
 };
 
 type Envelope<T> = { data: T };

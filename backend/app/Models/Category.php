@@ -16,6 +16,7 @@ class Category extends Model
         'ciphertext',
         'payload_version',
         'position',
+        'parent_id',
     ];
 
     protected function casts(): array
@@ -23,6 +24,7 @@ class Category extends Model
         return [
             'payload_version' => 'integer',
             'position' => 'integer',
+            'parent_id' => 'integer',
         ];
     }
 
@@ -34,5 +36,15 @@ class Category extends Model
     public function posts(): HasMany
     {
         return $this->hasMany(Post::class);
+    }
+
+    public function parent(): BelongsTo
+    {
+        return $this->belongsTo(self::class, 'parent_id');
+    }
+
+    public function children(): HasMany
+    {
+        return $this->hasMany(self::class, 'parent_id');
     }
 }

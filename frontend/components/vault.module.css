@@ -38,6 +38,58 @@
   gap: 0.25rem;
 }
 
+/*
+ * Отступ по уровню. --depth ставится инлайном на строке: правил под каждый
+ * уровень было бы пять, и они разъехались бы с MAX_DEPTH при первом же
+ * изменении предела.
+ */
+.categoryRow,
+.categoryEdit,
+.categoryInput {
+  padding-left: calc(var(--depth, 0) * 0.75rem);
+}
+
+.chevron {
+  appearance: none;
+  border: 0;
+  background: none;
+  color: var(--muted);
+  font: inherit;
+  font-size: 0.6875rem;
+  line-height: 1;
+  width: 1rem;
+  padding: 0.375rem 0;
+  border-radius: 0.375rem;
+  cursor: pointer;
+  flex: none;
+}
+
+.chevron:hover {
+  color: var(--fg);
+}
+
+/* Ширина шеврона, чтобы названия листьев и веток стояли в одну колонку */
+.chevronSpacer {
+  width: 1rem;
+  flex: none;
+}
+
+.categoryEdit {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.categoryEditName {
+  flex: 2;
+  min-width: 0;
+}
+
+.categoryEditParent {
+  flex: 3;
+  min-width: 0;
+}
+
 .categoryItem {
   flex: 1;
   appearance: none;
