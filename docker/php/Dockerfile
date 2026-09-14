@@ -16,6 +16,11 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # rewrite — для .htaccess, headers — для CSP и security-заголовков
 RUN a2enmod rewrite headers
 
+# Opcache включаем явно: базовый образ его не активирует, а на хостинге он есть.
+# Без него локально не воспроизводится единственный класс багов, специфичный для
+# деплоя через симлинки — кеширование разрешённого пути current → releases/<ts>.
+RUN docker-php-ext-enable opcache
+
 # Код монтируется с хоста, и Apache должен писать в storage/ и bootstrap/cache.
 # Подставить числовой uid через APACHE_RUN_USER нельзя: без записи в /etc/passwd
 # Apache падает с "getpwuid: couldn't determine user name" и остаётся под root.

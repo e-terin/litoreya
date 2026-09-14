@@ -1,25 +1,86 @@
+# Единственный .htaccess проекта.
+#
+# Этот файл лежит в веб-корне Laravel и потому автоматически используется во всех
+# трёх средах: dev (DocumentRoot = backend/public), prod-like и релиз на хостинге.
+# Копировать его никуда не нужно — расхождение сред здесь структурно невозможно.
+#
+# В проде рядом с index.php лежит статический экспорт Next.js: index.html, _next/.
+# Правила ниже разводят их по назначению. Порядок блоков существенен, см. пояснения.
+
+<IfModule mod_negotiation.c>
+    # -MultiViews критичен: в одном каталоге лежат index.php и index.html, и
+    # content negotiation начнёт угадывать за нас на путях вроде /index.
+    Options -MultiViews -Indexes
+</IfModule>
+
+# Обязательно здесь, а не в конфиге виртуального хоста: на shared хостинге vhost
+# нам не принадлежит. Без этой строки корень сайта отдаст index.php, то есть
+# JSON-404 от Laravel вместо SPA.
+DirectoryIndex index.html index.php
+
 <IfModule mod_rewrite.c>
-    <IfModule mod_negotiation.c>
-        Options -MultiViews -Indexes
-    </IfModule>
-
     RewriteEngine On
+    # Веб-корень достигается через симлинк; явный RewriteBase убирает зависимость
+    # от того, как mod_rewrite вычислит префикс.
+    RewriteBase /
 
-    # Handle Authorization Header
+    # Заголовки, которые не всегда доходят до PHP при mod_php/CGI
     RewriteCond %{HTTP:Authorization} .
     RewriteRule .* - [E=HTTP_AUTHORIZATION:%{HTTP:Authorization}]
 
-    # Handle X-XSRF-Token Header
     RewriteCond %{HTTP:x-xsrf-token} .
     RewriteRule .* - [E=HTTP_X_XSRF_TOKEN:%{HTTP:X-XSRF-Token}]
 
-    # Redirect Trailing Slashes If Not A Folder...
-    RewriteCond %{REQUEST_FILENAME} !-d
-    RewriteCond %{REQUEST_URI} (.+)/$
-    RewriteRule ^ %1 [L,R=301]
+    # 1. Корень — SPA. Дублирует DirectoryIndex на случай, если хостинг не даёт
+    #    переопределять его из .htaccess. Условие -f отключает правило в dev,
+    #    где статики нет.
+    RewriteCond %{DOCUMENT_ROOT}/index.html -f
+    RewriteRule ^$ index.html [L]
 
-    # Send Requests To Front Controller...
-    RewriteCond %{REQUEST_FILENAME} !-d
-    RewriteCond %{REQUEST_FILENAME} !-f
-    RewriteRule ^ index.php [L]
+    # 2. API — в Laravel. Безусловно, ДО проверок существования файла.
+    #    Если завязать на !-f, то появление любого файла под public/api/ начнёт
+    #    молча уводить часть запросов API в статику.
+    RewriteRule ^api(/|$) index.php [L]
+
+    # 3. Существующие файлы и каталоги отдаём как есть.
+    #    Это не оптимизация, а условие завершения рекурсии: флаг [L] в .htaccess
+    #    не означает «последний» — после подстановки набор запускается заново с
+    #    новым URI. Без этого блока fallback из п.5 зациклится до
+    #    AH00124 "exceeded the limit of 10 internal redirects", то есть 500 на
+    #    всём сайте, включая главную.
+    RewriteCond %{REQUEST_FILENAME} -f [OR]
+    RewriteCond %{REQUEST_FILENAME} -d
+    RewriteRule ^ - [L]
+
+    # 4. Отсутствующий ассет — честный 404, а не index.html со статусом 200.
+    #    Иначе у пользователя с открытой вкладкой после релиза запрос старого
+    #    чанка вернёт HTML, и браузер выдаст ChunkLoadError.
+    RewriteRule ^_next/ - [R=404,L]
+
+    # 5. Остальное — в SPA: роутинг клиентский, глубокие ссылки должны работать.
+    RewriteCond %{DOCUMENT_ROOT}/index.html -f
+    RewriteRule ^ index.html [L]
 </IfModule>
+
+<IfModule mod_headers.c>
+    # HTML не кешируем: он ссылается на конкретные хеши ассетов.
+    # Заголовки для самих ассетов — в public/_next/.htaccess, чтобы immutable
+    # не расползался на нехешированные файлы в корне (например, будущий sw.js).
+    <FilesMatch "\.html$">
+        Header set Cache-Control "no-cache, must-revalidate"
+    </FilesMatch>
+
+    Header always set X-Content-Type-Options "nosniff"
+    Header always set X-Frame-Options "DENY"
+
+    # Именно same-origin, не no-referrer: Sanctum в cookie-режиме опознаёт "свой"
+    # запрос по Referer/Origin, а для same-origin GET браузер Origin не отправляет.
+    # no-referrer убрал бы и Referer — сессия перестала бы применяться на всех GET.
+    Header always set Referrer-Policy "same-origin"
+</IfModule>
+
+# Точечные файлы (.env, .git, ...) недоступны никогда.
+# Правило матчит имя файла, а не каталога: точечные каталоги оно не закрывает.
+<FilesMatch "^\.">
+    Require all denied
+</FilesMatch>

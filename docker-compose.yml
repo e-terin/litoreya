@@ -72,10 +72,11 @@ services:
         GID: ${GID:-1000}
     image: litoreya-php:8.2
     volumes:
-      # Ровно та же пара каталогов, что на хостинге: ~/public_html и ~/laravel.
-      # Относительный путь ../../laravel из api/index.php совпадает здесь и там.
-      - ./deploy/public_html:/var/www/public_html
-      - ./backend:/var/www/laravel
+      # Всё дерево деплоя целиком — включая симлинки webroot → current → releases/<ts>.
+      # Живой backend/ намеренно НЕ монтируется: prod-like проверяет собранный
+      # релиз, иначе он не поймал бы «забыл включить файл в релиз» и эффекты
+      # config:cache. Быстрый цикл правок — в dev-режиме.
+      - ./deploy:/var/www/hosting
       - ./docker/php/vhost-prodlike.conf:/etc/apache2/sites-available/000-default.conf:ro
     ports:
       - "${PRODLIKE_PORT:-8081}:80"

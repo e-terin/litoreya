@@ -41,6 +41,7 @@ make prodlike  # http://localhost:8081
 
 - [docs/PLAN.md](docs/PLAN.md) — план проекта, этапы, принятые решения
 - [docs/crypto-design.md](docs/crypto-design.md) — криптографический дизайн
+- [docs/DEPLOY.md](docs/DEPLOY.md) — первичная выкладка на хостинг и обновление
 - [CLAUDE.md](CLAUDE.md) — ограничения стека, которые легко нарушить незаметно
 
 ## Лицензия

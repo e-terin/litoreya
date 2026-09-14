@@ -1,5 +1,5 @@
 .DEFAULT_GOAL := help
-.PHONY: help setup dev prodlike release down clean shell artisan migrate test test-back test-front test-integration
+.PHONY: help setup dev prodlike release deploy rollback smoke down clean shell artisan migrate test test-back test-front test-integration
 
 DC := docker compose
 NPM := docker run --rm -u $(shell id -u):$(shell id -g) -e HOME=/tmp -v "$(CURDIR)/frontend":/app -w /app node:20
@@ -21,8 +21,17 @@ dev: ## Dev-режим: Next :3000 + Laravel API :8080
 prodlike: release ## Prod-like: раскладка хостинга под Apache :8081
 	$(DC) --profile prodlike up
 
-release: ## Собрать deploy/public_html
+release: ## Собрать релиз в deploy/litoreya/releases/
 	./bin/build-release.sh
+
+deploy: ## Залить последний релиз на хостинг и переключить
+	./bin/deploy.sh
+
+rollback: ## Откатиться на предыдущий релиз
+	./bin/rollback.sh
+
+smoke: ## Дым-тест: make smoke URL=https://домен
+	./bin/smoke.sh $(or $(URL),http://localhost:$${PRODLIKE_PORT:-8081})
 
 down: ## Остановить всё
 	$(DC) --profile dev --profile prodlike down

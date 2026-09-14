@@ -1,0 +1,11 @@
+# Кладётся сборкой в public/_next/.htaccess.
+#
+# Ассеты Next.js содержат хеш в имени, поэтому кешируются навсегда. Отдельным
+# файлом, а не правилом в корневом .htaccess: FilesMatch матчит только имя файла,
+# без пути, и правило по расширению .js в корне однажды закеширует на год
+# нехешированный файл — например, service worker в фазе 5.
+<IfModule mod_headers.c>
+    <FilesMatch "\.(js|css|woff2?|png|svg|webp|avif|jpg|jpeg|gif|ico)$">
+        Header set Cache-Control "public, max-age=31536000, immutable"
+    </FilesMatch>
+</IfModule>
