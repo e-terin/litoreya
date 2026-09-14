@@ -19,6 +19,7 @@ import {
 } from "@/lib/vault";
 import { buildCategoryTree, descendantIds } from "@/lib/tree";
 import { CategorySidebar } from "./CategorySidebar";
+import { CopyButton } from "./CopyButton";
 import { PostEditor } from "./PostEditor";
 import s from "./ui.module.css";
 import v from "./vault.module.css";
@@ -222,18 +223,37 @@ function PostCard({ post, onOpen }: { post: Post; onOpen(): void }) {
           .join(" · ")
       : (payload as TextPayload).body.replace(/\s+/g, " ").slice(0, 90);
 
+  // Копировать можно только то, что расшифровалось
+  const secret =
+    post.type === "password" && !post.broken
+      ? (payload as PasswordPayload)
+      : null;
+
   return (
-    <button type="button" className={v.card} onClick={onOpen}>
-      <span className={v.cardTop}>
-        <span className={v.cardTitle}>
-          {post.broken ? "— недоступно —" : payload.title || "Без заголовка"}
+    <div className={v.card}>
+      {/*
+        Карточка перестала быть одной кнопкой: кнопку нельзя вложить в кнопку.
+        Открытие записи висит на внутренней кнопке, копирование — рядом с ней.
+      */}
+      <button type="button" className={v.cardOpen} onClick={onOpen}>
+        <span className={v.cardTop}>
+          <span className={v.cardTitle}>
+            {post.broken ? "— недоступно —" : payload.title || "Без заголовка"}
+          </span>
+          <span className={v.badge}>
+            {post.type === "password" ? "пароль" : "текст"}
+          </span>
         </span>
-        <span className={v.badge}>
-          {post.type === "password" ? "пароль" : "текст"}
-        </span>
-      </span>
-      {subtitle && <span className={v.cardMeta}>{subtitle}</span>}
-    </button>
+        {subtitle && <span className={v.cardMeta}>{subtitle}</span>}
+      </button>
+
+      {secret && (
+        <div className={v.cardActions}>
+          <CopyButton value={secret.username} label="Логин" />
+          <CopyButton value={secret.password} label="Пароль" />
+        </div>
+      )}
+    </div>
   );
 }
 

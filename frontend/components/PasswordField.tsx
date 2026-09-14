@@ -1,14 +1,14 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useState } from "react";
 import {
   CLIPBOARD_CLEAR_MS,
-  copyWithAutoClear,
   DEFAULT_PASSWORD_OPTIONS,
   generatePassword,
   passwordEntropyBits,
   type PasswordOptions,
 } from "@/lib/password";
+import { CopyButton } from "./CopyButton";
 import { SecretInput } from "./SecretInput";
 import s from "./ui.module.css";
 import v from "./vault.module.css";
@@ -25,21 +25,8 @@ export function PasswordField({
   onChange(next: string): void;
 }) {
   const [revealed, setRevealed] = useState(false);
-  const [copied, setCopied] = useState(false);
   const [showGenerator, setShowGenerator] = useState(false);
   const [options, setOptions] = useState<PasswordOptions>(DEFAULT_PASSWORD_OPTIONS);
-  const cancelClear = useRef<(() => void) | null>(null);
-
-  // Отменяем отложенную очистку, если компонент исчез раньше срока
-  useEffect(() => () => cancelClear.current?.(), []);
-
-  function copy() {
-    cancelClear.current?.();
-    cancelClear.current = copyWithAutoClear(value, () => setCopied(false));
-
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
-  }
 
   const bits = passwordEntropyBits(value);
 
@@ -60,14 +47,7 @@ export function PasswordField({
           value={value}
           onChange={(e) => onChange(e.target.value)}
         />
-        <button
-          type="button"
-          className={v.smallButton}
-          onClick={copy}
-          disabled={!value}
-        >
-          {copied ? "Скопировано" : "Копировать"}
-        </button>
+        <CopyButton value={value} label="Пароль" />
       </div>
 
       <p className={s.hint}>

@@ -10,6 +10,7 @@ import {
   type TextPayload,
 } from "@/lib/vault";
 import { flattenAll, type CategoryNode } from "@/lib/tree";
+import { CopyButton } from "./CopyButton";
 import { PasswordField } from "./PasswordField";
 import s from "./ui.module.css";
 import v from "./vault.module.css";
@@ -140,13 +141,16 @@ export function PostEditor({
               <label className={s.label} htmlFor="post-username">
                 Логин
               </label>
-              <input
-                id="post-username"
-                className={s.input}
-                autoComplete="off"
-                value={password.username}
-                onChange={(e) => patch({ username: e.target.value })}
-              />
+              <div className={v.secretRow}>
+                <input
+                  id="post-username"
+                  className={`${s.input} ${v.secretInput}`}
+                  autoComplete="off"
+                  value={password.username}
+                  onChange={(e) => patch({ username: e.target.value })}
+                />
+                <CopyButton value={password.username} label="Логин" />
+              </div>
             </div>
 
             <PasswordField

@@ -171,24 +171,47 @@
   gap: 0.375rem;
 }
 
+/*
+ * Карточка — не кнопка: внутри живут кнопки копирования, а кнопку в кнопку
+ * вкладывать нельзя. Рамка и фон остались на обёртке, клик по записи — на
+ * .cardOpen, который занимает всё оставшееся место.
+ */
 .card {
-  appearance: none;
-  width: 100%;
-  text-align: left;
   border: 1px solid var(--border);
   border-radius: 0.625rem;
   background: var(--bg);
   color: var(--fg);
-  font: inherit;
   padding: 0.75rem 0.875rem;
-  cursor: pointer;
-  display: grid;
-  gap: 0.1875rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
 }
 
 .card:hover {
   background: var(--surface);
 }
+
+.cardOpen {
+  appearance: none;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  padding: 0;
+  cursor: pointer;
+  display: grid;
+  gap: 0.1875rem;
+  flex: 1;
+  min-width: 0;
+}
+
+.cardActions {
+  display: flex;
+  gap: 0.25rem;
+  flex-shrink: 0;
+}
+
 
 .cardTop {
   display: flex;
@@ -220,6 +243,16 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+@media (max-width: 30rem) {
+  .card {
+    flex-wrap: wrap;
+  }
+
+  .cardActions {
+    width: 100%;
+  }
 }
 
 .empty {
