@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import { useSession } from "@/lib/session";
 import {
   loadCategories,
@@ -129,7 +130,9 @@ export function Dashboard() {
       <header className={s.bar}>
         <strong>Litoreya</strong>
         <div className={s.barActions}>
-          <span className={s.muted}>{user?.email}</span>
+          <Link href="/profile/" className={s.linkButton}>
+            {user?.email}
+          </Link>
           <button type="button" className={s.linkButton} onClick={lock}>
             Заблокировать
           </button>

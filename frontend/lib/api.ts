@@ -148,6 +148,20 @@ export const updateKeyphrase = (
     crypto: wrapper,
   });
 
+/**
+ * Смена пароля аккаунта. Данных не касается: пароль доказывает серверу, кто ты,
+ * а расшифровывает ключевая фраза.
+ *
+ * password_confirmation дублирует пароль: сервер требует confirmed, а сверку
+ * повтора уже сделала форма — второе поле до этого модуля не доезжает.
+ */
+export const updatePassword = (currentPassword: string, password: string) =>
+  request<{ message: string }>("PUT", "/auth/password", {
+    current_password: currentPassword,
+    password,
+    password_confirmation: password,
+  });
+
 // ---------------------------------------------------------------- записи
 
 /**

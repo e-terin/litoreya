@@ -12,6 +12,7 @@ import {
 import * as api from "./api";
 import {
   createEnvelope,
+  rewrapForNewKeyphrase,
   unlockWithKeyphrase,
   unlockWithRecoveryCode,
   type CryptoEnvelope,
@@ -48,6 +49,13 @@ type SessionValue = {
   acknowledgeRecoveryCode(): void;
   lock(): Promise<void>;
   signOut(): Promise<void>;
+
+  changePassword(currentPassword: string, password: string): Promise<void>;
+  changeKeyphrase(input: {
+    currentPassword: string;
+    oldKeyphrase: string;
+    newKeyphrase: string;
+  }): Promise<void>;
 };
 
 const SessionContext = createContext<SessionValue | null>(null);
@@ -164,6 +172,45 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     [envelope],
   );
 
+  const changePassword = useCallback(
+    async (currentPassword: string, password: string) => {
+      await api.updatePassword(currentPassword, password);
+      // Крипто-конверт не затрагивается: пароль и ключевая фраза независимы
+    },
+    [],
+  );
+
+  /**
+   * Смена ключевой фразы: DEK прежний, меняется только его обёртка.
+   *
+   * Старая фраза нужна не для подтверждения личности, а технически: ключ из
+   * KeyVault неизвлекаемый, а wrapKey работает только с extractable-ключом
+   * (docs/crypto-design.md §5.2). Поэтому DEK разворачивается заново.
+   */
+  const changeKeyphrase = useCallback<SessionValue["changeKeyphrase"]>(
+    async ({ currentPassword, oldKeyphrase, newKeyphrase }) => {
+      if (!envelope) throw new Error("Нет крипто-конверта");
+
+      const wrapper = await rewrapForNewKeyphrase(
+        oldKeyphrase,
+        newKeyphrase,
+        envelope,
+      );
+
+      const { crypto: updated } = await api.updateKeyphrase(
+        currentPassword,
+        wrapper,
+      );
+
+      // Обязательно: без этого «Заблокировать» в той же вкладке пошло бы
+      // разблокировать по устаревшей обёртке, и новая фраза не подошла бы
+      setEnvelope(updated);
+
+      // KeyVault не трогаем — там лежит тот же самый DEK
+    },
+    [envelope],
+  );
+
   const lock = useCallback(async () => {
     await keyVault.clear();
     setDek(null);
@@ -195,8 +242,10 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       acknowledgeRecoveryCode: () => setPendingRecoveryCode(null),
       lock,
       signOut,
+      changePassword,
+      changeKeyphrase,
     }),
-    [status, user, dek, pendingRecoveryCode, signIn, signUp, unlock, unlockWithRecovery, lock, signOut],
+    [status, user, dek, pendingRecoveryCode, signIn, signUp, unlock, unlockWithRecovery, lock, signOut, changePassword, changeKeyphrase],
   );
 
   return (

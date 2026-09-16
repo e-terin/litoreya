@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Auth\KeyphraseController;
 use App\Http\Controllers\Auth\LoginController;
+use App\Http\Controllers\Auth\PasswordController;
 use App\Http\Controllers\Auth\RegisterController;
 use App\Http\Controllers\Auth\SessionController;
 use App\Http\Controllers\CategoryController;
@@ -30,7 +31,13 @@ Route::middleware('throttle:auth')->group(function () {
 Route::middleware('auth:sanctum')->group(function () {
     Route::get('/auth/me', SessionController::class);
     Route::post('/auth/logout', [LoginController::class, 'destroy']);
-    Route::put('/auth/keyphrase', KeyphraseController::class);
+
+    // Подтверждаются паролем внутри открытой сессии, значит тоже перебираемы.
+    // Лимитер отдельный: auth ключуется по email, которого здесь нет.
+    Route::middleware('throttle:sensitive')->group(function () {
+        Route::put('/auth/keyphrase', KeyphraseController::class);
+        Route::put('/auth/password', PasswordController::class);
+    });
 
     Route::apiResource('categories', CategoryController::class)->except('show');
     Route::apiResource('posts', PostController::class);
