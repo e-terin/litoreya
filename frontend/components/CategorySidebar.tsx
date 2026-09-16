@@ -24,6 +24,7 @@ export function CategorySidebar({
   posts,
   active,
   expanded,
+  offline,
   onToggle,
   onSelect,
   onSave,
@@ -33,6 +34,8 @@ export function CategorySidebar({
   posts: Post[];
   active: Filter;
   expanded: Set<number>;
+  /** Без связи категории можно только просматривать. */
+  offline: boolean;
   onToggle(id: number): void;
   onSelect(filter: Filter): void;
   onSave(input: { id?: number; name: string; parentId?: number | null }): Promise<void>;
@@ -178,7 +181,7 @@ export function CategorySidebar({
               <span className={v.count}>{countIn(node)}</span>
             </button>
 
-            {node.depth + 1 < MAX_DEPTH && (
+            {node.depth + 1 < MAX_DEPTH && !offline && (
               <button
                 type="button"
                 className={v.iconButton}
@@ -196,6 +199,7 @@ export function CategorySidebar({
               type="button"
               className={v.iconButton}
               title="Переименовать"
+              hidden={offline}
               onClick={() => {
                 setEditing({ kind: "edit", id: node.id });
                 setDraft(node.name);
@@ -208,6 +212,7 @@ export function CategorySidebar({
               type="button"
               className={v.iconButton}
               title="Удалить"
+              hidden={offline}
               onClick={() => remove(node)}
             >
               ×
@@ -216,7 +221,7 @@ export function CategorySidebar({
         );
       })}
 
-      {editing?.kind === "new" ? (
+      {offline ? null : editing?.kind === "new" ? (
         <CategoryInput
           depth={
             editing.parentId === null

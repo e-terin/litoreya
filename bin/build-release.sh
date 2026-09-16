@@ -99,6 +99,19 @@ echo "==> Бэкенд: зависимости без dev"
 cp -r frontend/out/. "$RELEASE/public/"
 cp hosting/next-assets.htaccess "$RELEASE/public/_next/.htaccess"
 
+# Отметка релиза внутрь service worker. Без неё файл не меняется от релиза к
+# релизу: браузер сравнивает воркер побайтово, не увидит новой версии — и
+# пользователь навсегда останется на оболочке, закешированной в первый раз.
+sed -i "s/__RELEASE__/$STAMP/" "$RELEASE/public/sw.js"
+
+# Список ассетов для предзагрузки. Без него офлайн не работает после первого
+# же визита: чанки скачиваются раньше, чем воркер берёт управление, и в кеш
+# не попадают — остаётся разметка без скриптов, то есть вечное «Загрузка…».
+ASSETS="$(cd "$RELEASE/public" && find _next/static -type f \( -name '*.js' -o -name '*.css' \) \
+    | sed 's|^|/|' | sort | tr '\n' ' ' | sed 's/ $//')"
+[ -n "$ASSETS" ] || fail "не нашёл ассетов _next/static для предзагрузки"
+sed -i "s|__ASSETS__|$ASSETS|" "$RELEASE/public/sw.js"
+
 # ---------------------------------------------------------------- проверки
 
 echo "==> Проверки релиза"
@@ -106,6 +119,35 @@ echo "==> Проверки релиза"
 [ -e "$RELEASE/public/index.php" ]  || fail "нет public/index.php"
 [ -s "$RELEASE/public/index.html" ] || fail "нет public/index.html — фронт не собрался"
 [ -d "$RELEASE/public/_next" ]      || fail "нет public/_next"
+[ -s "$RELEASE/public/sw.js" ]      || fail "нет public/sw.js"
+[ -s "$RELEASE/public/manifest.webmanifest" ] || fail "нет манифеста PWA"
+
+# Незаменённый плейсхолдер означает, что все релизы для браузера выглядят
+# одинаково и обновление оболочки никогда не приедет
+! grep -q '__RELEASE__' "$RELEASE/public/sw.js" \
+    || fail "в sw.js остался плейсхолдер __RELEASE__"
+
+! grep -q '__ASSETS__' "$RELEASE/public/sw.js" \
+    || fail "в sw.js остался плейсхолдер __ASSETS__ — офлайн не заработает"
+
+# Каждая ссылка из разметки обязана быть в списке предзагрузки. Пропущенный
+# чанк не ломает сайт онлайн и проявляется только офлайн — вечным экраном
+# «Загрузка…», потому что пререндеренную разметку некому оживить.
+( cd "$RELEASE/public" && python3 - <<'PYCHECK'
+import re, pathlib, sys
+
+assets = set(re.search(r'const ASSETS = "([^"]*)"', pathlib.Path("sw.js").read_text()).group(1).split())
+missing = []
+
+for page in pathlib.Path(".").glob("**/index.html"):
+    refs = set(re.findall(r'/_next/static/[A-Za-z0-9._/-]+\.(?:js|css)', page.read_text()))
+    missing += [f"{page}: {r}" for r in sorted(refs - assets)]
+
+if missing:
+    print("ассеты вне предзагрузки:", *missing, sep="\n  ", file=sys.stderr)
+    sys.exit(1)
+PYCHECK
+) || fail "разметка ссылается на ассеты, которых нет в предзагрузке sw.js"
 [ -e "$RELEASE/public/.htaccess" ]  || fail "нет public/.htaccess"
 [ -d "$RELEASE/vendor" ]            || fail "нет vendor/"
 [ -f "$RELEASE/bootstrap/cache/packages.php" ] || fail "манифест пакетов не собран"

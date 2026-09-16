@@ -20,6 +20,7 @@ export function PostEditor({
   tree,
   onSave,
   onDelete,
+  offline,
   onCancel,
 }: {
   post: Post | null;
@@ -31,6 +32,8 @@ export function PostEditor({
     payload: PostPayload;
   }): Promise<void>;
   onDelete(id: number): Promise<void>;
+  /** Без связи запись можно только смотреть. */
+  offline: boolean;
   onCancel(): void;
 }) {
   const [type, setType] = useState<PostType>(post?.type ?? "password");
@@ -224,7 +227,12 @@ export function PostEditor({
         </div>
 
         <div className={v.actions}>
-          <button className={s.button} type="submit" disabled={busy}>
+          <button
+            className={s.button}
+            type="submit"
+            disabled={busy || offline}
+            title={offline ? "Нужна связь с сервером" : undefined}
+          >
             {busy ? "Шифрование…" : "Сохранить"}
           </button>
 
@@ -235,7 +243,7 @@ export function PostEditor({
               type="button"
               className={`${s.linkButton} ${v.danger}`}
               onClick={remove}
-              disabled={busy}
+              disabled={busy || offline}
             >
               Удалить
             </button>

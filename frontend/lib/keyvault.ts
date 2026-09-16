@@ -14,9 +14,8 @@
  * подменой класса, а не переписыванием вызывающего кода.
  */
 
-const DB_NAME = "litoreya";
-const DB_VERSION = 1;
-const STORE = "vault";
+import { openDatabase, promisify, STORE_VAULT as STORE } from "./idb";
+
 const KEY_ID = "dek";
 
 /** Через сколько бездействия ключ стирается. Плата за PBKDF2 — 1-2 с на
@@ -35,29 +34,6 @@ type VaultRecord = {
   dek: CryptoKey;
   lastUsedAt: number;
 };
-
-function openDatabase(): Promise<IDBDatabase> {
-  return new Promise((resolve, reject) => {
-    const request = indexedDB.open(DB_NAME, DB_VERSION);
-
-    request.onupgradeneeded = () => {
-      const db = request.result;
-      if (!db.objectStoreNames.contains(STORE)) {
-        db.createObjectStore(STORE, { keyPath: "id" });
-      }
-    };
-
-    request.onsuccess = () => resolve(request.result);
-    request.onerror = () => reject(request.error);
-  });
-}
-
-function promisify<T>(request: IDBRequest<T>): Promise<T> {
-  return new Promise((resolve, reject) => {
-    request.onsuccess = () => resolve(request.result);
-    request.onerror = () => reject(request.error);
-  });
-}
 
 export class IndexedDbKeyVault implements KeyVault {
   constructor(private readonly autoLockMs: number = AUTO_LOCK_MS) {}

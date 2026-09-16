@@ -13,8 +13,13 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
-# rewrite — для .htaccess, headers — для CSP и security-заголовков
-RUN a2enmod rewrite headers
+# rewrite — для .htaccess, headers — для CSP и security-заголовков.
+#
+# expires включён не потому, что он нам нужен, а потому что он включён на
+# хостинге: его ExpiresByType переспоривает Cache-Control из mod_headers.
+# Без этого модуля локально расхождение не воспроизводится — оно всплыло
+# только на проде, где sw.js приехал с max-age=86400 вместо no-store.
+RUN a2enmod rewrite headers expires
 
 # Opcache включаем явно: базовый образ его не активирует, а на хостинге он есть.
 # Без него локально не воспроизводится единственный класс багов, специфичный для

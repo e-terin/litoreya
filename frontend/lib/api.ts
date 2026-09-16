@@ -191,8 +191,17 @@ export type CategoryRecord = EncryptedRecord & {
 
 type Envelope<T> = { data: T };
 
-export const listPosts = () =>
-  request<Envelope<PostRecord[]>>("GET", "/posts").then((r) => r.data);
+/**
+ * Без аргумента — всё; с updatedSince — только изменившееся с этого момента,
+ * включая удалённое (у него проставлен deleted_at). На этом стоит офлайн-синк.
+ */
+export const listPosts = (updatedSince?: string | null) =>
+  request<Envelope<PostRecord[]>>(
+    "GET",
+    updatedSince
+      ? `/posts?updated_since=${encodeURIComponent(updatedSince)}`
+      : "/posts",
+  ).then((r) => r.data);
 
 export const createPost = (body: Record<string, unknown>) =>
   request<Envelope<PostRecord>>("POST", "/posts", body).then((r) => r.data);

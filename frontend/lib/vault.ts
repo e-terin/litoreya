@@ -7,6 +7,7 @@
 
 import * as api from "./api";
 import { decryptPayload, encryptPayload } from "./crypto";
+import * as offline from "./offline";
 
 // ---------------------------------------------------------------- содержимое
 
@@ -86,10 +87,31 @@ async function decryptOrMark<T>(
   }
 }
 
-export async function loadPosts(dek: CryptoKey): Promise<Post[]> {
-  const records = await api.listPosts();
+/**
+ * Записи: сначала синхронизируемся с сервером, потом расшифровываем из кеша.
+ *
+ * Источник истины для интерфейса — локальный кеш, а не ответ сервера. Так
+ * путь без сети ничем не отличается от пути с сетью: отличается только то,
+ * удалось ли перед этим обновить кеш.
+ *
+ * Сетевая ошибка здесь не ошибка: это офлайн. Возвращаем, что есть, и
+ * сообщаем вызывающему коду через synced.
+ */
+export async function loadPosts(
+  dek: CryptoKey,
+): Promise<{ posts: Post[]; synced: boolean }> {
+  let synced = true;
 
-  return Promise.all(
+  try {
+    const since = await offline.lastPostSync();
+    await offline.mergePosts(await api.listPosts(since));
+  } catch {
+    synced = false;
+  }
+
+  const records = await offline.readCached<api.PostRecord>("post");
+
+  const posts = await Promise.all(
     records.map(
       (record) =>
         decryptOrMark<PostPayload>(
@@ -113,12 +135,24 @@ export async function loadPosts(dek: CryptoKey): Promise<Post[]> {
         ) as Promise<Post>,
     ),
   );
+
+  return { posts, synced };
 }
 
-export async function loadCategories(dek: CryptoKey): Promise<Category[]> {
-  const records = await api.listCategories();
+export async function loadCategories(
+  dek: CryptoKey,
+): Promise<{ categories: Category[]; synced: boolean }> {
+  let synced = true;
 
-  return Promise.all(
+  try {
+    await offline.replaceCategories(await api.listCategories());
+  } catch {
+    synced = false;
+  }
+
+  const records = await offline.readCached<api.CategoryRecord>("category");
+
+  const categories = await Promise.all(
     records.map(
       (record) =>
         decryptOrMark<CategoryPayload>(
@@ -142,6 +176,8 @@ export async function loadCategories(dek: CryptoKey): Promise<Category[]> {
         ) as Promise<Category>,
     ),
   );
+
+  return { categories, synced };
 }
 
 // ---------------------------------------------------------------- запись

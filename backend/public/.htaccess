@@ -62,12 +62,39 @@ DirectoryIndex index.html index.php
     RewriteRule ^ index.html [L]
 </IfModule>
 
+# Хостинг не знает расширения .webmanifest и отдаёт файл без Content-Type.
+# Браузер имеет право не считать это манифестом — и PWA молча не установится.
+<IfModule mod_mime.c>
+    AddType application/manifest+json .webmanifest
+</IfModule>
+
+# mod_expires со своим ExpiresByType переспоривает Cache-Control из mod_headers,
+# поэтому для этих двух файлов срок жизни выключаем целиком.
+#
+# На боевом хостинге это правило до .js не доберётся: там перед Apache стоит
+# nginx, и статику он отдаёт сам, минуя .htaccess (см. docs/DEPLOY.md). Правило
+# всё равно нужно — оно работает в prod-like и на хостингах без nginx впереди,
+# а полагаться на чужую раскладку в собственном конфиге неправильно.
+<IfModule mod_expires.c>
+    <FilesMatch "^(sw\.js|manifest\.webmanifest)$">
+        ExpiresActive Off
+    </FilesMatch>
+</IfModule>
+
 <IfModule mod_headers.c>
     # HTML не кешируем: он ссылается на конкретные хеши ассетов.
     # Заголовки для самих ассетов — в public/_next/.htaccess, чтобы immutable
     # не расползался на нехешированные файлы в корне (например, будущий sw.js).
     <FilesMatch "\.html$">
         Header set Cache-Control "no-cache, must-revalidate"
+    </FilesMatch>
+
+    # Service worker и манифест не хешируются в имени, а обновляться обязаны
+    # сразу: залипший в кеше sw.js означает, что новая версия приложения не
+    # приедет к пользователю вообще. Правило именно здесь, а не в _next/, —
+    # там лежит противоположное, immutable на год.
+    <FilesMatch "^(sw\.js|manifest\.webmanifest)$">
+        Header always set Cache-Control "no-cache, no-store, must-revalidate"
     </FilesMatch>
 
     Header always set X-Content-Type-Options "nosniff"

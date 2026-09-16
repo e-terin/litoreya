@@ -18,6 +18,7 @@ import {
   type CryptoEnvelope,
 } from "./crypto";
 import { keyVault } from "./keyvault";
+import { clearCache, readSession, saveSession } from "./offline";
 
 /*
  * Состояние сессии складывается из двух независимых вещей:
@@ -74,24 +75,47 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     let cancelled = false;
 
     (async () => {
+      let session: api.Session | null = null;
+
       try {
-        const session = await api.me();
+        session = await api.me();
+        await saveSession(session);
+      } catch (e) {
         if (cancelled) return;
 
-        setUser(session.user);
-        setEnvelope(session.crypto);
+        if (e instanceof api.ApiError) {
+          // Сервер ответил — значит сессии действительно нет.
+          // 401 здесь обычное состояние, а не ошибка.
+          await keyVault.clear();
+          await clearCache().catch(() => undefined);
+          setStatus("anonymous");
 
-        const stored = await keyVault.get();
-        if (cancelled) return;
+          return;
+        }
 
-        setDek(stored);
-        setStatus(stored ? "unlocked" : "locked");
-      } catch {
-        if (cancelled) return;
-        // 401 — обычное состояние для незалогиненного, не ошибка
-        await keyVault.clear();
-        setStatus("anonymous");
+        // Сети нет. Ответа сервера мы не получили, поэтому судить о сессии
+        // не можем и НЕ стираем ключ: офлайн-перезагрузка иначе выкидывала бы
+        // на форму входа поверх полного кеша записей.
+        session = await readSession();
+
+        if (!session) {
+          // Офлайн и без снимка — показать нечего
+          setStatus("anonymous");
+
+          return;
+        }
       }
+
+      if (cancelled) return;
+
+      setUser(session.user);
+      setEnvelope(session.crypto);
+
+      const stored = await keyVault.get();
+      if (cancelled) return;
+
+      setDek(stored);
+      setStatus(stored ? "unlocked" : "locked");
     })();
 
     return () => {
@@ -113,6 +137,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
 
   const signIn = useCallback(async (email: string, password: string) => {
     const session = await api.login(email, password);
+    await saveSession(session);
 
     setUser(session.user);
     setEnvelope(session.crypto);
@@ -138,6 +163,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     });
 
     await keyVault.store(freshDek);
+    await saveSession(session);
 
     setUser(session.user);
     setEnvelope(session.crypto);
@@ -221,6 +247,8 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     await api.logout().catch(() => undefined);
     // Ключ стираем в любом случае: сервер до него не дотягивается
     await keyVault.clear();
+    // И офлайн-копию: чужие блобы в браузере после выхода оставлять незачем
+    await clearCache().catch(() => undefined);
 
     setUser(null);
     setEnvelope(null);

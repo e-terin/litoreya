@@ -41,18 +41,22 @@ export function Dashboard() {
   const [editing, setEditing] = useState<Editing>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [offline, setOffline] = useState(false);
 
   const refresh = useCallback(async () => {
     if (!dek) return;
 
     try {
-      const [loadedPosts, loadedCategories] = await Promise.all([
+      const [posts, categories] = await Promise.all([
         loadPosts(dek),
         loadCategories(dek),
       ]);
 
-      setPosts(loadedPosts);
-      setCategories(loadedCategories);
+      setPosts(posts.posts);
+      setCategories(categories.categories);
+
+      // Сеть недоступна — не ошибка: показываем кеш и говорим об этом
+      setOffline(!posts.synced || !categories.synced);
       setError(null);
     } catch {
       setError("Не удалось загрузить записи");
@@ -142,8 +146,16 @@ export function Dashboard() {
         </div>
       </header>
 
+      {offline && (
+        <p className={s.notice} role="status">
+          Нет связи с сервером. Записи открываются из локальной копии;
+          изменения станут доступны, когда связь вернётся.
+        </p>
+      )}
+
       <div className={v.layout}>
         <CategorySidebar
+          offline={offline}
           tree={tree}
           posts={posts}
           active={filter}
@@ -162,6 +174,7 @@ export function Dashboard() {
             <PostEditor
               post={editing.post}
               tree={tree}
+              offline={offline}
               onSave={handleSave}
               onDelete={handleDelete}
               onCancel={() => setEditing(null)}
@@ -179,6 +192,8 @@ export function Dashboard() {
                 <button
                   type="button"
                   className={s.button}
+                  disabled={offline}
+                  title={offline ? "Нужна связь с сервером" : undefined}
                   onClick={() => setEditing({ post: null })}
                 >
                   + Запись

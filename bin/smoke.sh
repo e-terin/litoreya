@@ -76,6 +76,69 @@ check "GET /_next/... несуществующий чанк" "404" "$(code "$BAS
 # 500 здесь означает петлю внутренних редиректов в SPA-fallback.
 check "GET /deep/link  (SPA-fallback)" "200" "$(code "$BASE/deep/link")"
 
+# PWA. Отсутствие любого из файлов не ломает сайт, но молча отключает офлайн —
+# проявится не ошибкой, а жалобой «в метро ничего не открывается».
+#
+# Проверяем ТИП и СОДЕРЖИМОЕ, а не код ответа: SPA-fallback на отсутствующий
+# путь честно отдаёт index.html со статусом 200, и проверка по коду показывала
+# бы установленный PWA там, где его нет вовсе.
+# Оба типа валидны для JS, и хостинги расходятся: у нас text/javascript,
+# на shared — application/javascript. Важно лишь, что это не text/html,
+# то есть не подсунутая fallback'ом страница.
+sw_type=$(ctype "$BASE/sw.js")
+case "$sw_type" in
+    text/javascript|application/javascript)
+        printf '  ok    %-52s %s\n' "GET /sw.js тип" "$sw_type" ;;
+    *)
+        printf '  ПЛОХО %-52s %s (ждали javascript)\n' "GET /sw.js тип" "$sw_type"
+        FAILED=1 ;;
+esac
+check "GET /manifest.webmanifest тип" "application/manifest+json" \
+    "$(ctype "$BASE/manifest.webmanifest")"
+check "GET /icon-192.png тип" "image/png" "$(ctype "$BASE/icon-192.png")"
+
+sw=$(curl -sk "$BASE/sw.js")
+
+# Тот ли это файл. Заодно отсекает страницу, подсунутую fallback'ом.
+case "$sw" in
+    *"litoreya-\${RELEASE}"*) printf '  ok    %-52s\n' "sw.js — наш воркер" ;;
+    *) printf '  ПЛОХО %-52s\n' "sw.js — наш воркер"; FAILED=1 ;;
+esac
+
+# Незаменённые плейсхолдеры: релиз — обновление оболочки не приедет никогда;
+# ассеты — офлайн не заработает после первого же визита.
+case "$sw" in
+    *__RELEASE__*|*__ASSETS__*)
+        printf '  ПЛОХО %-52s\n' "в sw.js подставлены релиз и ассеты"; FAILED=1 ;;
+    *) printf '  ok    %-52s\n' "в sw.js подставлены релиз и ассеты" ;;
+esac
+
+# Залипший в кеше воркер означает, что новая версия приложения не приедет
+# к пользователю вообще: браузер будет отдавать старый файл из HTTP-кеша.
+sw_cache=$(curl -skI "$BASE/sw.js" | tr -d '\r' | grep -i '^cache-control:' | tr 'A-Z' 'a-z')
+
+# max-age здесь — предупреждение, а не провал, и это осознанно.
+#
+# На боевом хостинге перед Apache стоит nginx, и статику (.js, .png) он отдаёт
+# сам: до .htaccess запрос не доходит, наши заголовки не применяются вовсе.
+# Починить это из репозитория нельзя — только настройками хостинга.
+#
+# Обновления воркера это не ломает: регистрация в components/ServiceWorker.tsx
+# идёт с updateViaCache: "none", а при нём браузер не спрашивает HTTP-кеш для
+# файла воркера. Если эту опцию когда-нибудь уберут, предупреждение станет
+# настоящей проблемой — тогда воркер будет обновляться раз в сутки.
+case "$sw_cache" in
+    *no-store*)
+        printf '  ok    %-52s\n' "sw.js не кешируется" ;;
+    *max-age*)
+        printf '  ПРЕДУПР %-50s %s\n' \
+            "sw.js кешируется сервером" "$(printf '%s' "$sw_cache" | tr '\n' ' ')"
+        printf '        %s\n' "статику отдаёт nginx мимо .htaccess; спасает updateViaCache: none" ;;
+    *)
+        printf '  ПЛОХО %-52s %s\n' "sw.js не кешируется" "${sw_cache:-заголовка нет}"
+        FAILED=1 ;;
+esac
+
 # Секреты не должны быть доступны ни при каких условиях.
 #
 # Проверяем СОДЕРЖИМОЕ, а не код ответа: у SPA-fallback путь без файла честно
